@@ -5,28 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>납품 현황판</title>
 <style>
-  :root {
-    --bg: #1a1d23;
-    --panel: #23272f;
-    --panel-border: #343a45;
-    --text-main: #eef1f5;
-    --text-dim: #8992a3;
-    --ok: #3fae6a;
-    --ok-dim: #274b36;
-    --warn: #f2a33c;
-    --warn-dim: #4d3a1a;
-    --danger: #e6483f;
-    --danger-dim: #4d1f1c;
-    --done: #4b525f;
-  }
-
   * { box-sizing: border-box; }
 
   html, body {
     margin: 0;
     padding: 0;
-    background: var(--bg);
-    color: var(--text-main);
+    background: #1a1d23;
+    color: #eef1f5;
     font-family: 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
     height: 100%;
     overflow: hidden;
@@ -43,7 +28,7 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    border-bottom: 3px solid var(--panel-border);
+    border-bottom: 3px solid #343a45;
     padding-bottom: 18px;
     margin-bottom: 22px;
   }
@@ -57,51 +42,50 @@
 
   #clock {
     font-size: 22px;
-    color: var(--text-dim);
+    color: #8992a3;
     font-variant-numeric: tabular-nums;
   }
 
   #status {
     font-size: 15px;
-    color: var(--text-dim);
+    color: #8992a3;
     margin-top: 6px;
   }
 
-  #status.err { color: var(--danger); }
+  #status.err { color: #e6483f; }
 
   #grid {
     flex: 1;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
     overflow-y: auto;
-    align-content: start;
+    padding-bottom: 20px;
   }
 
   .card {
-    background: var(--panel);
-    border: 2px solid var(--panel-border);
+    display: inline-block;
+    vertical-align: top;
+    width: 340px;
+    max-width: 100%;
+    margin: 0 16px 16px 0;
+    background: #23272f;
+    border: 2px solid #343a45;
     border-radius: 10px;
     padding: 18px 20px;
     position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
   }
 
   .card.level-danger {
-    border-color: var(--danger);
-    background: linear-gradient(180deg, var(--danger-dim), var(--panel) 70%);
+    border-color: #e6483f;
+    background: linear-gradient(180deg, #4d1f1c, #23272f 70%);
     animation: pulse 1.4s ease-in-out infinite;
   }
 
   .card.level-warn {
-    border-color: var(--warn);
-    background: linear-gradient(180deg, var(--warn-dim), var(--panel) 70%);
+    border-color: #f2a33c;
+    background: linear-gradient(180deg, #4d3a1a, #23272f 70%);
   }
 
   .card.level-ok {
-    border-color: var(--ok-dim);
+    border-color: #274b36;
   }
 
   .card.level-done {
@@ -117,6 +101,7 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    margin-bottom: 8px;
   }
 
   .dday {
@@ -126,14 +111,14 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .level-danger .dday { color: var(--danger); }
-  .level-warn .dday { color: var(--warn); }
-  .level-ok .dday { color: var(--ok); }
-  .level-done .dday { color: var(--done); }
+  .level-danger .dday { color: #e6483f; }
+  .level-warn .dday { color: #f2a33c; }
+  .level-ok .dday { color: #3fae6a; }
+  .level-done .dday { color: #4b525f; }
 
   .date-line {
     font-size: 14px;
-    color: var(--text-dim);
+    color: #8992a3;
     text-align: right;
   }
 
@@ -141,18 +126,21 @@
     font-size: 22px;
     font-weight: 700;
     word-break: break-all;
+    margin-bottom: 6px;
   }
 
   .qty-line {
     font-size: 18px;
     font-weight: 700;
+    margin-bottom: 6px;
   }
-  .qty-line .frac { color: var(--text-dim); font-weight: 500; font-size: 15px; }
+  .qty-line .frac { color: #8992a3; font-weight: 500; font-size: 15px; }
 
   .spec-line {
     font-size: 13px;
-    color: var(--text-dim);
+    color: #8992a3;
     line-height: 1.4;
+    margin-bottom: 6px;
   }
 
   .note-badge {
@@ -172,13 +160,13 @@
     padding: 3px 10px;
     border-radius: 20px;
   }
-  .level-danger .status-badge { background: var(--danger); color: #fff; }
-  .level-warn .status-badge { background: var(--warn); color: #2a1c00; }
-  .level-ok .status-badge { background: var(--ok); color: #04170a; }
-  .level-done .status-badge { background: var(--done); color: #d7dbe2; }
+  .level-danger .status-badge { background: #e6483f; color: #fff; }
+  .level-warn .status-badge { background: #f2a33c; color: #2a1c00; }
+  .level-ok .status-badge { background: #3fae6a; color: #04170a; }
+  .level-done .status-badge { background: #4b525f; color: #d7dbe2; }
 
   #empty {
-    color: var(--text-dim);
+    color: #8992a3;
     font-size: 22px;
     padding: 60px;
     text-align: center;

@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>납품 현황판</title>
 <style>
   * { box-sizing: border-box; }
@@ -394,7 +397,8 @@ function tryCSVChain(order, idx, errors) {
     return;
   }
   var entry = order[idx];
-  xhrGet(entry.url, false, function (text) {
+  var bustedUrl = entry.url + (entry.url.indexOf("?") >= 0 ? "&" : "?") + "_=" + new Date().getTime();
+  xhrGet(bustedUrl, false, function (text) {
     try {
       var rows = parseCSV(text);
       var records = toRecords(rows);
@@ -419,7 +423,8 @@ function load() {
   isLoading = true;
 
   if (APPS_SCRIPT_URL) {
-    xhrGet(APPS_SCRIPT_URL, true, function (records) {
+    var bustedUrl = APPS_SCRIPT_URL + (APPS_SCRIPT_URL.indexOf("?") >= 0 ? "&" : "?") + "_=" + new Date().getTime();
+    xhrGet(bustedUrl, true, function (records) {
       render(records);
       setStatus("마지막 갱신: " + new Date().toLocaleTimeString("ko-KR") + " (Apps Script)", false);
       isLoading = false;

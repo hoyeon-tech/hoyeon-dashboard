@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>납품 현황판</title>
+<style>
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #1a1d23;
+    color: #eef1f5;
+    font-family: 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 28px 36px;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 3px solid #343a45;
+    padding-bottom: 18px;
+    margin-bottom: 22px;
+  }
+
+  header h1 {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin: 0;
+  }
+
+  #clock {
+    font-size: 22px;
+    color: #8992a3;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #status {
+    font-size: 15px;
+    color: #8992a3;
+    margin-top: 6px;
+  }
+
+  #status.err { color: #e6483f; }
+
+  #grid {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 20px;
+  }
+
+  .card {
+    display: inline-block;
+    vertical-align: top;
+    width: 340px;
+    height: 200px;
+    max-width: 100%;
+    margin: 0 16px 16px 0;
+    background: #23272f;
+    border: 2px solid #343a45;
+    border-radius: 10px;
+    padding: 16px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card.level-danger {
+    border-color: #e6483f;
+    background: linear-gradient(180deg, #4d1f1c, #23272f 70%);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  .card.level-warn {
+    border-color: #f2a33c;
+    background: linear-gradient(180deg, #4d3a1a, #23272f 70%);
+  }
+
+  .card.level-ok {
+    border-color: #274b36;
+  }
+
+  .card.level-done {
+    opacity: 0.4;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(230, 72, 63, 0.55); }
+    50% { box-shadow: 0 0 0 10px rgba(230, 72, 63, 0); }
+  }
+
+  .top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+
+  .dday {
+    font-size: 38px;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .level-danger .dday { color: #e6483f; }
+  .level-warn .dday { color: #f2a33c; }
+  .level-ok .dday { color: #3fae6a; }
+  .level-done .dday { color: #4b525f; }
+
+  .date-line {
+    font-size: 14px;
+    color: #8992a3;
+    text-align: right;
+  }
+
+  .title-line {
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.5px;
+    word-break: break-all;
+    margin-bottom: 10px;
+    max-height: 70px;
+    overflow: hidden;
+  }
+
+  .qty-line {
+    font-size: 26px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .qty-line .frac { color: #8992a3; font-weight: 600; font-size: 20px; }
+
+  .bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 14px;
+  }
+
+  .note-badge {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: #3a4150;
+    color: #c7cede;
+    max-width: 200px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .status-badge {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .level-danger .status-badge { background: #e6483f; color: #fff; }
+  .level-warn .status-badge { background: #f2a33c; color: #2a1c00; }
+  .level-ok .status-badge { background: #3fae6a; color: #04170a; }
+  .level-done .status-badge { background: #4b525f; color: #d7dbe2; }
+
+  #empty {
+    color: #8992a3;
+    font-size: 22px;
+    padding: 60px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <h1>납품 현황판</h1>
+      <div id="status">불러오는 중...</div>
+    </div>
+    <div id="clock"></div>
+  </header>
+  <div id="grid"></div>
+</div>
+
+<script>
+// ===== 설정 =====
+var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwKSUKzoXQ5VVAtLuv6L92-4ZLZpM4Xy_vTBlSCipVngfXbbu8_mnrO5CF_arhc7w/exec";
+
+var SHEET_ID = "1dQXdZFNk0RRY1KKQIAuVuGUYpqd5TejbBZQalI0DYQQ";
+var SHEET_NAME = "DATA";
+var PUB_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRLXM6kN4l93bVUkEre3LPO6jz6CsdIeYrdScwn6b8TW_Fmh1ibVztXWEoQi31Wc1rPAMsTXozm0Arx/pub?gid=1372408514&single=true&output=csv";
+var GVIZ_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(SHEET_NAME);
+var EXPORT_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv";
+
+var CSV_URL_CANDIDATES = [
+  { name: "웹게시(pub)", url: PUB_CSV_URL },
+  { name: "gviz API", url: GVIZ_URL },
+  { name: "CORS 프록시 경유 gviz", url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(GVIZ_URL) },
+  { name: "CORS 프록시 경유 export", url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(EXPORT_URL) }
+];
+var REFRESH_MS = 60 * 1000;
+
+var COL = {
+  date: "date",
+  name: "name",
+  qtyDue: "qtyDue",
+  qtyIn: "qtyIn",
+  inDate: "inDate",
+  spec: "spec",
+  note: "note"
+};
+
+// CSV 방식(백업용)에서만 쓰이는 한글 헤더 → 위치 매핑 (A~G열 고정 순서)
+function toRecords(rows) {
+  var records = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    records.push({
+      date: (r[0] || "").replace(/^\s+|\s+$/g, ""),
+      name: (r[1] || "").replace(/^\s+|\s+$/g, ""),
+      qtyDue: (r[2] || "").replace(/^\s+|\s+$/g, ""),
+      qtyIn: (r[3] || "").replace(/^\s+|\s+$/g, ""),
+      inDate: (r[4] || "").replace(/^\s+|\s+$/g, ""),
+      spec: (r[5] || "").replace(/^\s+|\s+$/g, ""),
+      note: (r[6] || "").replace(/^\s+|\s+$/g, "")
+    });
+  }
+  return records;
+}
+
+// ===== 구형 브라우저 호환용 XHR 헬퍼 (fetch 대신 사용) =====
+function xhrGet(url, isJson, onSuccess, onError) {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", url, true);
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState === 4) {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          if (isJson) {
+            var data;
+            try { data = JSON.parse(xhr.responseText); }
+            catch (e) { onError("JSON 파싱 실패: " + e.message); return; }
+            onSuccess(data);
+          } else {
+            if (!xhr.responseText || xhr.responseText.replace(/^\s+|\s+$/g, "") === "") {
+              onError("빈 응답");
+            } else {
+              onSuccess(xhr.responseText);
+            }
+          }
+        } else {
+          onError("HTTP " + xhr.status);
+        }
+      }
+    };
+    xhr.onerror = function () { onError("네트워크 오류"); };
+    xhr.send();
+  } catch (e) {
+    onError("요청 실패: " + e.message);
+  }
+}
+
+function parseCSV(text) {
+  var rows = [];
+  var row = [], field = "", inQuotes = false;
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charAt(i);
+    if (inQuotes) {
+      if (c === '"') {
+        if (text.charAt(i + 1) === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ""; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  var out = [];
+  for (var j = 0; j < rows.length; j++) {
+    var hasContent = false;
+    for (var k = 0; k < rows[j].length; k++) {
+      if (rows[j][k].replace(/^\s+|\s+$/g, "") !== "") { hasContent = true; break; }
+    }
+    if (hasContent) out.push(rows[j]);
+  }
+  return out;
+}
+
+
+function parseDate(s) {
+  if (!s) return null;
+  var str = String(s).replace(/^\s+|\s+$/g, "");
+
+  // ISO 형식 (2026-09-10T07:00:00.000Z) — 시간대 보정을 피하기 위해 날짜 부분만 추출
+  var iso = str.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (iso) {
+    return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  }
+
+  // 2026/09/10 또는 2026-09-10 또는 2026.09.10
+  var plain = str.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+  if (plain) {
+    return new Date(Number(plain[1]), Number(plain[2]) - 1, Number(plain[3]));
+  }
+
+  // 그 외 형식은 브라우저 기본 파싱에 맡김
+  var cleaned = str.replace(/\./g, "-").replace(/\//g, "-");
+  var d = new Date(cleaned);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function parseNum(s) {
+  if (!s) return 0;
+  var n = parseFloat(String(s).replace(/,/g, "").replace(/^\s+|\s+$/g, ""));
+  return isNaN(n) ? 0 : n;
+}
+
+function ddayInfo(dateObj) {
+  var now = new Date();
+  var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var target = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  var diffDays = Math.round((target - today) / 86400000);
+  var label, level;
+  if (diffDays < 0) { label = "D+" + Math.abs(diffDays); level = "danger"; }
+  else if (diffDays === 0) { label = "D-DAY"; level = "danger"; }
+  else if (diffDays <= 3) { label = "D-" + diffDays; level = "danger"; }
+  else if (diffDays <= 7) { label = "D-" + diffDays; level = "warn"; }
+  else { label = "D-" + diffDays; level = "ok"; }
+  return { diffDays: diffDays, label: label, level: level };
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// 비고에 날짜가 들어온 경우 "8/26" 형태로 표시
+function fmtNote(s) {
+  if (!s) return "";
+  var str = String(s).replace(/^\s+|\s+$/g, "");
+  var iso = str.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (iso) {
+    return Number(iso[2]) + "/" + Number(iso[3]);
+  }
+  return str;
+}
+
+function normKey(s) {
+  return String(s).replace(/\s+/g, "").replace(/^\s+|\s+$/g, "");
+}
+
+function getField(record, colName) {
+  if (record[colName] !== undefined) return record[colName];
+  var target = normKey(colName);
+  for (var k in record) {
+    if (Object.prototype.hasOwnProperty.call(record, k) && normKey(k) === target) {
+      return record[k];
+    }
+  }
+  return "";
+}
+
+function render(records) {
+  var grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
+  var items = [];
+  for (var i = 0; i < records.length; i++) {
+    var r = records[i];
+    var d = parseDate(getField(r, COL.date));
+    if (!d) continue;
+    var qtyDue = parseNum(getField(r, COL.qtyDue));
+    var qtyIn = parseNum(getField(r, COL.qtyIn));
+    var done = qtyDue > 0 && qtyIn >= qtyDue;
+    items.push({ raw: r, date: d, qtyDue: qtyDue, qtyIn: qtyIn, done: done });
+  }
+
+  if (!items.length) {
+    var debugMsg = "표시할 일정이 없습니다. 시트 데이터를 확인해주세요.";
+    if (records.length > 0) {
+      var sampleKeys = [];
+      for (var kk in records[0]) { if (Object.prototype.hasOwnProperty.call(records[0], kk)) sampleKeys.push(kk); }
+      debugMsg += "<br><br><span style='font-size:13px;'>(원본 " + records.length + "건 수신됨 · 인식된 컬럼: " + sampleKeys.join(", ") + ")</span>";
+    }
+    grid.innerHTML = '<div id="empty">' + debugMsg + '</div>';
+    return;
+  }
+
+  items.sort(function (a, b) {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    return a.date - b.date;
+  });
+
+  var html = "";
+  for (var k = 0; k < items.length; k++) {
+    var it = items[k];
+    var info = ddayInfo(it.date);
+    var level = it.done ? "done" : info.level;
+    var dateStr = it.date.toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" });
+    var note = fmtNote(getField(it.raw, COL.note));
+    var name = getField(it.raw, COL.name) || "(품명 없음)";
+    var statusText = it.done ? "납품완료" : (level === "danger" ? "긴급" : (level === "warn" ? "임박" : "여유"));
+
+    html += '<div class="card level-' + level + '">';
+    html += '  <div class="top-row">';
+    html += '    <div class="dday">' + (it.done ? "완료" : info.label) + '</div>';
+    html += '    <div class="date-line">' + esc(dateStr) + '</div>';
+    html += '  </div>';
+    html += '  <div class="title-line">' + esc(name) + '</div>';
+    html += '  <div class="qty-line">' + it.qtyIn.toLocaleString() + ' <span class="frac">/ ' + it.qtyDue.toLocaleString() + ' 납품</span></div>';
+    html += '  <div class="bottom-row">';
+    html += note ? ('    <div class="note-badge">' + esc(note) + '</div>') : '    <div></div>';
+    html += '    <div class="status-badge">' + statusText + '</div>';
+    html += '  </div>';
+    html += '</div>';
+  }
+  grid.innerHTML = html;
+}
+
+var workingSourceIndex = 0;
+var isLoading = false;
+
+function setStatus(text, isErr) {
+  var statusEl = document.getElementById("status");
+  statusEl.innerHTML = text;
+  statusEl.className = isErr ? "err" : "";
+}
+
+function tryCSVChain(order, idx, errors) {
+  if (idx >= order.length) {
+    setStatus("불러오기 실패 — 모든 방식 실패 (" + errors.join(" / ") + "). 시트 공유 설정을 확인하세요.", true);
+    isLoading = false;
+    return;
+  }
+  var entry = order[idx];
+  var bustedUrl = entry.url + (entry.url.indexOf("?") >= 0 ? "&" : "?") + "_=" + new Date().getTime();
+  xhrGet(bustedUrl, false, function (text) {
+    try {
+      var rows = parseCSV(text);
+      var records = toRecords(rows);
+      render(records);
+      for (var i = 0; i < CSV_URL_CANDIDATES.length; i++) {
+        if (CSV_URL_CANDIDATES[i].url === entry.url) { workingSourceIndex = i; break; }
+      }
+      setStatus("마지막 갱신: " + new Date().toLocaleTimeString("ko-KR") + " (" + entry.name + ")", false);
+      isLoading = false;
+    } catch (e) {
+      errors.push(entry.name + ": " + e.message);
+      tryCSVChain(order, idx + 1, errors);
+    }
+  }, function (msg) {
+    errors.push(entry.name + ": " + msg);
+    tryCSVChain(order, idx + 1, errors);
+  });
+}
+
+function load() {
+  if (isLoading) return;
+  isLoading = true;
+
+  if (APPS_SCRIPT_URL) {
+    var bustedUrl = APPS_SCRIPT_URL + (APPS_SCRIPT_URL.indexOf("?") >= 0 ? "&" : "?") + "_=" + new Date().getTime();
+    xhrGet(bustedUrl, true, function (records) {
+      render(records);
+      setStatus("마지막 갱신: " + new Date().toLocaleTimeString("ko-KR") + " (Apps Script)", false);
+      isLoading = false;
+    }, function (msg) {
+      // Apps Script 실패 시 CSV 방식들로 순서대로 전환
+      var order = CSV_URL_CANDIDATES.slice(workingSourceIndex).concat(CSV_URL_CANDIDATES.slice(0, workingSourceIndex));
+      tryCSVChain(order, 0, ["Apps Script: " + msg]);
+    });
+    return;
+  }
+
+  var order2 = CSV_URL_CANDIDATES.slice(workingSourceIndex).concat(CSV_URL_CANDIDATES.slice(0, workingSourceIndex));
+  tryCSVChain(order2, 0, []);
+}
+
+function tickClock() {
+  document.getElementById("clock").textContent = new Date().toLocaleString("ko-KR", {
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit"
+  });
+}
+
+tickClock();
+setInterval(tickClock, 1000);
+load();
+setInterval(load, REFRESH_MS);
+</script>
+</body>
+</html>

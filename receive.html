@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>납품 처리</title>
+<style>
+  :root {
+    --bg: #1a1d23;
+    --panel: #23272f;
+    --panel-border: #343a45;
+    --text-main: #eef1f5;
+    --text-dim: #8992a3;
+    --ok: #3fae6a;
+    --warn: #f2a33c;
+    --danger: #e6483f;
+    --accent: #4f8cff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text-main);
+    font-family: 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    min-height: 100%;
+  }
+  #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  header {
+    padding: 16px;
+    border-bottom: 2px solid var(--panel-border);
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+  }
+  header h1 { font-size: 20px; margin: 0 0 10px 0; }
+
+  #search {
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 18px;
+    border-radius: 10px;
+    border: 2px solid var(--panel-border);
+    background: var(--panel);
+    color: var(--text-main);
+  }
+  #search:focus { outline: none; border-color: var(--accent); }
+
+  #status { font-size: 13px; color: var(--text-dim); margin-top: 8px; }
+  #status.err { color: var(--danger); }
+
+  #list { flex: 1; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+  .item {
+    background: var(--panel);
+    border: 2px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .item:active { background: #2c313a; }
+
+  .item-main { flex: 1; min-width: 0; }
+  .item-name { font-size: 18px; font-weight: 700; word-break: break-all; }
+  .item-sub { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+  .item-qty { font-size: 14px; margin-top: 4px; }
+  .item-qty b { font-size: 16px; }
+
+  .dday-tag {
+    font-size: 12px; font-weight: 700;
+    padding: 4px 9px; border-radius: 20px;
+    white-space: nowrap;
+  }
+  .dday-danger { background: var(--danger); color: #fff; }
+  .dday-warn { background: var(--warn); color: #2a1c00; }
+  .dday-ok { background: var(--ok); color: #04170a; }
+
+  #empty { text-align: center; color: var(--text-dim); padding: 60px 20px; font-size: 16px; }
+
+  /* 납품 입력 모달 */
+  #modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: none; align-items: flex-end; justify-content: center;
+    z-index: 20;
+  }
+  #modal-backdrop.open { display: flex; }
+
+  #modal {
+    background: var(--panel);
+    width: 100%; max-width: 480px;
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px 32px;
+  }
+  #modal h2 { margin: 0 0 4px 0; font-size: 20px; }
+  #modal .sub { color: var(--text-dim); font-size: 14px; margin-bottom: 20px; }
+
+  #qty-input {
+    width: 100%;
+    font-size: 32px;
+    text-align: center;
+    padding: 16px;
+    border-radius: 12px;
+    border: 2px solid var(--panel-border);
+    background: var(--bg);
+    color: var(--text-main);
+    margin-bottom: 16px;
+  }
+  #qty-input:focus { outline: none; border-color: var(--accent); }
+
+  .quick-btns { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .quick-btn {
+    flex: 1; min-width: 70px;
+    padding: 12px; border-radius: 10px;
+    border: 2px solid var(--panel-border);
+    background: var(--bg); color: var(--text-main);
+    font-size: 15px; font-weight: 600;
+  }
+  .quick-btn:active { background: #2c313a; }
+
+  .modal-actions { display: flex; gap: 10px; }
+  .btn { flex: 1; padding: 16px; border-radius: 12px; border: none; font-size: 17px; font-weight: 700; }
+  .btn-cancel { background: #343a45; color: var(--text-main); }
+  .btn-submit { background: var(--ok); color: #04170a; }
+  .btn:disabled { opacity: 0.5; }
+
+  #toast {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    background: var(--ok); color: #04170a; padding: 12px 20px;
+    border-radius: 10px; font-weight: 700; font-size: 15px;
+    z-index: 30; display: none;
+  }
+  #toast.err { background: var(--danger); color: #fff; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>납품 처리</h1>
+    <input id="search" type="text" placeholder="품명 검색...">
+    <div id="status">불러오는 중...</div>
+  </header>
+  <div id="list"></div>
+</div>
+
+<div id="toast"></div>
+
+<div id="modal-backdrop">
+  <div id="modal">
+    <h2 id="modal-title"></h2>
+    <div class="sub" id="modal-sub"></div>
+    <input id="qty-input" type="number" inputmode="numeric" placeholder="0">
+    <div class="quick-btns" id="quick-btns"></div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="btn-cancel">취소</button>
+      <button class="btn btn-submit" id="btn-submit">납품 처리</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwKSUKzoXQ5VVAtLuv6L92-4ZLZpM4Xy_vTBlSCipVngfXbbu8_mnrO5CF_arhc7w/exec";
+
+const COL = {
+  date: "date",
+  name: "name",
+  qtyDue: "qtyDue",
+  qtyIn: "qtyIn",
+  spec: "spec",
+  note: "note"
+};
+
+function normKey(s) {
+  return String(s).replace(/\s+/g, "").trim();
+}
+
+function getField(record, colName) {
+  if (record[colName] !== undefined) return record[colName];
+  const target = normKey(colName);
+  for (const k in record) {
+    if (Object.prototype.hasOwnProperty.call(record, k) && normKey(k) === target) {
+      return record[k];
+    }
+  }
+  return "";
+}
+
+let allItems = [];
+let currentItem = null;
+
+function parseNum(s) {
+  if (!s) return 0;
+  const n = parseFloat(String(s).replace(/,/g, "").trim());
+  return isNaN(n) ? 0 : n;
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  const str = String(s).trim();
+
+  const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+
+  const plain = str.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+  if (plain) return new Date(Number(plain[1]), Number(plain[2]) - 1, Number(plain[3]));
+
+  const d = new Date(str.replace(/\./g, "-").replace(/\//g, "-"));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function ddayInfo(dateObj) {
+  if (!dateObj) return { label: "-", level: "ok" };
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  const diffDays = Math.round((target - today) / 86400000);
+  if (diffDays < 0) return { label: `D+${Math.abs(diffDays)}`, level: "danger" };
+  if (diffDays === 0) return { label: "D-DAY", level: "danger" };
+  if (diffDays <= 3) return { label: `D-${diffDays}`, level: "danger" };
+  if (diffDays <= 7) return { label: `D-${diffDays}`, level: "warn" };
+  return { label: `D-${diffDays}`, level: "ok" };
+}
+
+async function loadData() {
+  const statusEl = document.getElementById("status");
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const records = await res.json();
+    allItems = records
+      .map(r => {
+        const qtyDue = parseNum(getField(r, COL.qtyDue));
+        const qtyIn = parseNum(getField(r, COL.qtyIn));
+        return {
+          raw: r,
+          row: r["_row"],
+          date: parseDate(getField(r, COL.date)),
+          qtyDue, qtyIn,
+          remaining: Math.max(qtyDue - qtyIn, 0),
+          done: qtyDue > 0 && qtyIn >= qtyDue
+        };
+      })
+      .filter(it => !it.done)
+      .sort((a, b) => (a.date || 0) - (b.date || 0));
+    render();
+    statusEl.textContent = `${allItems.length}건 대기 중 · 갱신: ${new Date().toLocaleTimeString("ko-KR")}`;
+    statusEl.className = "";
+  } catch (e) {
+    statusEl.textContent = "불러오기 실패: " + e.message;
+    statusEl.className = "err";
+  }
+}
+
+function render() {
+  const listEl = document.getElementById("list");
+  const q = document.getElementById("search").value.trim().toLowerCase();
+  const filtered = q
+    ? allItems.filter(it => (getField(it.raw, COL.name) || "").toLowerCase().includes(q))
+    : allItems;
+
+  listEl.innerHTML = "";
+  if (!filtered.length) {
+    listEl.innerHTML = '<div id="empty">해당하는 미납품 품목이 없습니다.</div>';
+    return;
+  }
+
+  filtered.forEach(it => {
+    const info = ddayInfo(it.date);
+    const dateStr = it.date ? it.date.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : "-";
+    const div = document.createElement("div");
+    div.className = "item";
+    div.innerHTML = `
+      <div class="item-main">
+        <div class="item-name">${getField(it.raw, COL.name) || "(품명 없음)"}</div>
+        <div class="item-sub">${dateStr} 예정 · ${getField(it.raw, COL.spec) || ""}</div>
+        <div class="item-qty">${it.qtyIn.toLocaleString()} / ${it.qtyDue.toLocaleString()} 납품 · <b>잔여 ${it.remaining.toLocaleString()}</b></div>
+      </div>
+      <div class="dday-tag dday-${info.level}">${info.label}</div>
+    `;
+    div.addEventListener("click", () => openModal(it));
+    listEl.appendChild(div);
+  });
+}
+
+function openModal(item) {
+  currentItem = item;
+  document.getElementById("modal-title").textContent = getField(item.raw, COL.name) || "(품명 없음)";
+  document.getElementById("modal-sub").textContent =
+    `현재 ${item.qtyIn.toLocaleString()} / ${item.qtyDue.toLocaleString()} · 잔여 ${item.remaining.toLocaleString()}`;
+  const qtyInput = document.getElementById("qty-input");
+  qtyInput.value = item.remaining > 0 ? item.remaining : "";
+
+  const quickWrap = document.getElementById("quick-btns");
+  quickWrap.innerHTML = "";
+  const quicks = [item.remaining].filter(v => v > 0);
+  [10, 50, 100, 500].forEach(v => quicks.push(v));
+  [...new Set(quicks)].slice(0, 4).forEach(v => {
+    const b = document.createElement("button");
+    b.className = "quick-btn";
+    b.textContent = v.toLocaleString();
+    b.addEventListener("click", () => { qtyInput.value = v; });
+    quickWrap.appendChild(b);
+  });
+
+  document.getElementById("modal-backdrop").classList.add("open");
+  qtyInput.focus();
+}
+
+function closeModal() {
+  document.getElementById("modal-backdrop").classList.remove("open");
+  currentItem = null;
+}
+
+function showToast(msg, isErr) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = isErr ? "err" : "";
+  t.style.display = "block";
+  setTimeout(() => { t.style.display = "none"; }, 2200);
+}
+
+async function submitReceiving() {
+  const qty = parseFloat(document.getElementById("qty-input").value);
+  if (!currentItem || !qty || qty <= 0) {
+    showToast("수량을 올바르게 입력해주세요", true);
+    return;
+  }
+  const btn = document.getElementById("btn-submit");
+  btn.disabled = true;
+  btn.textContent = "처리 중...";
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // preflight 회피
+      body: JSON.stringify({ row: currentItem.row, addQty: qty })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || "처리 실패");
+    showToast(`납품 처리 완료: ${getField(currentItem.raw, COL.name)} +${qty.toLocaleString()}`, false);
+    closeModal();
+    await loadData();
+  } catch (e) {
+    showToast("실패: " + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "납품 처리";
+  }
+}
+
+document.getElementById("search").addEventListener("input", render);
+document.getElementById("btn-cancel").addEventListener("click", closeModal);
+document.getElementById("btn-submit").addEventListener("click", submitReceiving);
+document.getElementById("modal-backdrop").addEventListener("click", (e) => {
+  if (e.target.id === "modal-backdrop") closeModal();
+});
+
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>

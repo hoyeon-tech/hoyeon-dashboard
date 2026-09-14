@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>납품 일정</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    background: #14171c; color: #eef1f5;
+    font-family: 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    min-height: 100%;
+  }
+
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: #14171c;
+    border-bottom: 2px solid #2e3440;
+    padding: 14px 16px 10px;
+  }
+  .head-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 10px; margin-bottom: 10px;
+  }
+  h1 { font-size: 20px; font-weight: 800; }
+  #clock { font-size: 13px; color: #6b7383; white-space: nowrap; }
+
+  #search {
+    width: 100%; padding: 12px 14px; font-size: 16px;
+    border-radius: 10px; border: 2px solid #39404e;
+    background: #222731; color: #eef1f5;
+  }
+  #search:focus { outline: none; border-color: #4f8cff; }
+
+  .filters { display: flex; gap: 7px; margin-top: 10px; overflow-x: auto; padding-bottom: 2px; }
+  .filters::-webkit-scrollbar { display: none; }
+  .fbtn {
+    padding: 7px 14px; border-radius: 20px; border: 2px solid #39404e;
+    background: #1c2028; color: #9aa3b2; font-size: 13px; font-weight: 700;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .fbtn.on { background: #2a4a7a; border-color: #4f8cff; color: #eef1f5; }
+
+  #status { font-size: 11px; color: #4d5563; margin-top: 7px; }
+  #status.err { color: #ff5a4d; }
+
+  main { padding: 12px 16px 40px; }
+
+  .group-label {
+    font-size: 13px; font-weight: 800; letter-spacing: 1px;
+    color: #6b7383; margin: 16px 0 8px; display: flex; align-items: center; gap: 9px;
+  }
+  .group-label:first-child { margin-top: 2px; }
+  .group-label .ln { flex: 1; height: 1px; background: #2e3440; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+  @media (min-width: 620px)  { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1000px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 1400px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+
+  .card {
+    background: #222731; border: 2px solid #39404e; border-radius: 12px;
+    padding: 13px 15px; display: flex; flex-direction: column; gap: 7px;
+    border-left-width: 6px;
+  }
+  .card.danger { border-color: #39404e; border-left-color: #ff5a4d; }
+  .card.warn   { border-color: #39404e; border-left-color: #ffb02e; }
+  .card.ok     { border-color: #39404e; border-left-color: #4ac97e; }
+  .card.done   { opacity: 0.38; border-left-color: #6b7383; }
+
+  .c-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .dday { font-size: 22px; font-weight: 900; line-height: 1; letter-spacing: -0.5px; }
+  .danger .dday { color: #ff5a4d; }
+  .warn   .dday { color: #ffb02e; }
+  .ok     .dday { color: #4ac97e; }
+  .done   .dday { color: #6b7383; font-size: 17px; }
+  .date { font-size: 13px; color: #9aa3b2; white-space: nowrap; }
+
+  .name { font-size: 19px; font-weight: 800; word-break: break-all; line-height: 1.2; }
+
+  .c-bot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .qty { font-size: 15px; font-variant-numeric: tabular-nums; }
+  .qty b { font-size: 18px; font-weight: 900; }
+  .qty .sep { color: #6b7383; }
+  .remain { color: #ffb02e; font-weight: 800; }
+  .done .remain { color: #6b7383; }
+
+  .note {
+    font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+    background: #39404e; color: #c7cede;
+  }
+
+  .empty { text-align: center; color: #6b7383; padding: 60px 20px; font-size: 16px; }
+
+  .fab {
+    position: fixed; right: 18px; bottom: 22px;
+    width: 50px; height: 50px; border-radius: 50%;
+    background: #2a4a7a; border: 2px solid #4f8cff; color: #eef1f5;
+    font-size: 20px; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+  }
+  .fab:active { background: #35578c; }
+</style>
+</head>
+<body>
+<header>
+  <div class="head-row">
+    <h1>납품 일정</h1>
+    <span id="clock"></span>
+  </div>
+  <input id="search" type="text" placeholder="품명 검색...">
+  <div class="filters">
+    <button class="fbtn on" data-f="all">전체</button>
+    <button class="fbtn" data-f="urgent">긴급 (3일)</button>
+    <button class="fbtn" data-f="week">이번 주</button>
+    <button class="fbtn" data-f="late">지연</button>
+    <button class="fbtn" data-f="done">완료</button>
+  </div>
+  <div id="status">불러오는 중...</div>
+</header>
+
+<main id="main"></main>
+<button class="fab" id="refresh" title="새로고침">⟳</button>
+
+<script>
+var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyQcw5_g0rei6gwiue-cC5A6HgbnagX1EQtBk1pE2O36nAUeoMg4PCrWI-ABc247KLH/exec";
+
+var items = [];
+var filter = "all";
+
+function parseNum(s) {
+  if (!s) return 0;
+  var n = parseFloat(String(s).replace(/,/g, "").trim());
+  return isNaN(n) ? 0 : n;
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  var str = String(s).trim();
+  var iso = str.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (iso) return new Date(+iso[1], +iso[2]-1, +iso[3]);
+  var p = str.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+  if (p) return new Date(+p[1], +p[2]-1, +p[3]);
+  var d = new Date(str.replace(/\./g,"-").replace(/\//g,"-"));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function fmtNote(s) {
+  if (!s) return "";
+  var str = String(s).trim();
+  var iso = str.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (iso) return (+iso[2]) + "/" + (+iso[3]);
+  return str;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function dday(d) {
+  var n = new Date();
+  var today = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  var t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  var diff = Math.round((t - today) / 86400000);
+  var label, cls;
+  if (diff < 0) { label = "D+" + Math.abs(diff); cls = "danger"; }
+  else if (diff === 0) { label = "D-DAY"; cls = "danger"; }
+  else if (diff <= 3) { label = "D-" + diff; cls = "danger"; }
+  else if (diff <= 7) { label = "D-" + diff; cls = "warn"; }
+  else { label = "D-" + diff; cls = "ok"; }
+  return { diff: diff, label: label, cls: cls };
+}
+
+function setStatus(t, err) {
+  var el = document.getElementById("status");
+  el.textContent = t;
+  el.className = err ? "err" : "";
+}
+
+function load() {
+  setStatus("불러오는 중...");
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", APPS_SCRIPT_URL + "?_=" + Date.now(), true);
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState !== 4) return;
+    if (xhr.status >= 200 && xhr.status < 300) {
+      try {
+        var recs = JSON.parse(xhr.responseText);
+        items = [];
+        for (var i = 0; i < recs.length; i++) {
+          var r = recs[i];
+          var d = parseDate(r.date);
+          if (!d) continue;
+          var qtyDue = parseNum(r.qtyDue), qtyIn = parseNum(r.qtyIn);
+          items.push({
+            date: d, name: r.name || "(품명없음)",
+            qtyDue: qtyDue, qtyIn: qtyIn,
+            remaining: Math.max(qtyDue - qtyIn, 0),
+            note: fmtNote(r.note),
+            done: qtyDue > 0 && qtyIn >= qtyDue
+          });
+        }
+        items.sort(function (a, b) { return a.date - b.date; });
+        render();
+        setStatus("갱신 " + new Date().toLocaleTimeString("ko-KR") + " · 전체 " + items.length + "건");
+      } catch (e) {
+        setStatus("데이터 오류", true);
+      }
+    } else {
+      setStatus("불러오기 실패 (HTTP " + xhr.status + ")", true);
+    }
+  };
+  xhr.onerror = function () { setStatus("네트워크 오류", true); };
+  xhr.send();
+}
+
+function cardHTML(it) {
+  var info = dday(it.date);
+  var cls = it.done ? "done" : info.cls;
+  var wd = ["일","월","화","수","목","금","토"][it.date.getDay()];
+  var ds = (it.date.getMonth()+1) + "월 " + it.date.getDate() + "일 (" + wd + ")";
+
+  var h = '<div class="card ' + cls + '">';
+  h += '<div class="c-top">';
+  h += '<span class="dday">' + (it.done ? "납품완료" : info.label) + '</span>';
+  h += '<span class="date">' + ds + '</span>';
+  h += '</div>';
+  h += '<div class="name">' + esc(it.name) + '</div>';
+  h += '<div class="c-bot">';
+  h += '<span class="qty"><b>' + it.qtyIn.toLocaleString() + '</b> <span class="sep">/ ' +
+       it.qtyDue.toLocaleString() + '</span>' +
+       (it.done ? '' : ' · <span class="remain">잔여 ' + it.remaining.toLocaleString() + '</span>') +
+       '</span>';
+  if (it.note) h += '<span class="note">' + esc(it.note) + '</span>';
+  h += '</div></div>';
+  return h;
+}
+
+function render() {
+  var main = document.getElementById("main");
+  var q = document.getElementById("search").value.trim().toLowerCase();
+
+  var list = items.filter(function (it) {
+    if (q && it.name.toLowerCase().indexOf(q) < 0) return false;
+    var info = dday(it.date);
+    if (filter === "done") return it.done;
+    if (it.done) return false;
+    if (filter === "urgent") return info.diff <= 3;
+    if (filter === "week") return info.diff >= 0 && info.diff <= 7;
+    if (filter === "late") return info.diff < 0;
+    return true;
+  });
+
+  if (!list.length) {
+    main.innerHTML = '<div class="empty">해당하는 일정이 없습니다.</div>';
+    return;
+  }
+
+  if (filter !== "all") {
+    main.innerHTML = '<div class="grid">' + list.map(cardHTML).join("") + '</div>';
+    return;
+  }
+
+  // 전체 보기: 그룹으로 나눠서 표시
+  var groups = [
+    { name: "지연", test: function (i) { return !i.done && dday(i.date).diff < 0; } },
+    { name: "긴급 · 3일 이내", test: function (i) { return !i.done && dday(i.date).diff >= 0 && dday(i.date).diff <= 3; } },
+    { name: "이번 주", test: function (i) { return !i.done && dday(i.date).diff > 3 && dday(i.date).diff <= 7; } },
+    { name: "예정", test: function (i) { return !i.done && dday(i.date).diff > 7; } },
+    { name: "납품완료", test: function (i) { return i.done; } }
+  ];
+
+  var html = "";
+  for (var g = 0; g < groups.length; g++) {
+    var sub = list.filter(groups[g].test);
+    if (!sub.length) continue;
+    html += '<div class="group-label"><span>' + groups[g].name + ' ' + sub.length + '</span><span class="ln"></span></div>';
+    html += '<div class="grid">' + sub.map(cardHTML).join("") + '</div>';
+  }
+  main.innerHTML = html;
+}
+
+function tickClock() {
+  document.getElementById("clock").textContent =
+    new Date().toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+document.getElementById("search").addEventListener("input", render);
+document.getElementById("refresh").addEventListener("click", load);
+
+var btns = document.querySelectorAll(".fbtn");
+for (var i = 0; i < btns.length; i++) {
+  btns[i].addEventListener("click", function () {
+    for (var j = 0; j < btns.length; j++) btns[j].className = "fbtn";
+    this.className = "fbtn on";
+    filter = this.getAttribute("data-f");
+    render();
+    window.scrollTo(0, 0);
+  });
+}
+
+tickClock();
+setInterval(tickClock, 30000);
+load();
+setInterval(load, 120000);
+</script>
+</body>
+</html>

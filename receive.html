@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>납품 처리</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    background: #14171c; color: #eef1f5;
+    font-family: 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    min-height: 100%;
+  }
+  #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  header {
+    padding: 14px 16px 10px;
+    border-bottom: 2px solid #2e3440;
+    position: sticky; top: 0; background: #14171c; z-index: 5;
+  }
+  .head-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  header h1 { font-size: 20px; }
+
+  .tabs { display: flex; gap: 8px; }
+  .tab {
+    padding: 8px 16px; border-radius: 20px; border: 2px solid #39404e;
+    background: #1c2028; color: #9aa3b2; font-size: 14px; font-weight: 700;
+  }
+  .tab.active { background: #2a4a7a; border-color: #4f8cff; color: #eef1f5; }
+
+  #search {
+    width: 100%; padding: 13px 15px; font-size: 17px; border-radius: 10px;
+    border: 2px solid #39404e; background: #222731; color: #eef1f5; margin-top: 10px;
+  }
+  #search:focus { outline: none; border-color: #4f8cff; }
+  #status { font-size: 12px; color: #6b7383; margin-top: 7px; }
+  #status.err { color: #ff5a4d; }
+
+  .list { flex: 1; padding: 12px 16px 30px; display: flex; flex-direction: column; gap: 9px; }
+
+  .item {
+    background: #222731; border: 2px solid #39404e; border-radius: 12px;
+    padding: 13px 15px; display: flex; justify-content: space-between;
+    align-items: center; gap: 12px;
+  }
+  .item:active { background: #2b313b; }
+  .item-main { flex: 1; min-width: 0; }
+  .item-name { font-size: 18px; font-weight: 800; word-break: break-all; }
+  .item-sub { font-size: 12px; color: #6b7383; margin-top: 3px; }
+  .item-qty { font-size: 14px; margin-top: 4px; color: #c7cede; }
+  .item-qty b { font-size: 16px; color: #eef1f5; }
+
+  .tag { font-size: 12px; font-weight: 800; padding: 5px 10px; border-radius: 20px; white-space: nowrap; }
+  .t-danger { background: #ff5a4d; color: #fff; }
+  .t-warn { background: #ffb02e; color: #2a1c00; }
+  .t-ok { background: #3fae6a; color: #04170a; }
+
+  /* 이력 */
+  .log-item {
+    background: #1c2028; border: 2px solid #2e3440; border-radius: 12px;
+    padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  .log-item.cancelled { opacity: 0.45; }
+  .log-name { font-size: 16px; font-weight: 700; }
+  .log-meta { font-size: 12px; color: #6b7383; margin-top: 3px; }
+  .log-qty { font-size: 15px; font-weight: 800; color: #4ac97e; margin-top: 3px; }
+  .log-item.cancelled .log-qty { color: #6b7383; text-decoration: line-through; }
+  .btn-undo {
+    padding: 9px 14px; border-radius: 9px; border: 2px solid #ff5a4d;
+    background: transparent; color: #ff5a4d; font-size: 14px; font-weight: 800; white-space: nowrap;
+  }
+  .btn-undo:active { background: #3a1c19; }
+  .undo-done { font-size: 12px; color: #6b7383; font-weight: 700; white-space: nowrap; }
+
+  .empty { text-align: center; color: #6b7383; padding: 50px 20px; font-size: 16px; }
+
+  #backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+    display: none; align-items: flex-end; justify-content: center; z-index: 20;
+  }
+  #backdrop.open { display: flex; }
+  #modal {
+    background: #222731; width: 100%; max-width: 480px;
+    border-radius: 20px 20px 0 0; padding: 22px 20px 30px;
+  }
+  #modal h2 { font-size: 20px; margin-bottom: 3px; }
+  #modal .sub { color: #9aa3b2; font-size: 14px; margin-bottom: 18px; }
+  #qty {
+    width: 100%; font-size: 32px; text-align: center; padding: 15px;
+    border-radius: 12px; border: 2px solid #39404e; background: #14171c;
+    color: #eef1f5; margin-bottom: 14px; font-weight: 800;
+  }
+  #qty:focus { outline: none; border-color: #4f8cff; }
+  .quicks { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .quick {
+    flex: 1; min-width: 68px; padding: 11px; border-radius: 10px;
+    border: 2px solid #39404e; background: #14171c; color: #eef1f5;
+    font-size: 15px; font-weight: 700;
+  }
+  .quick:active { background: #2b313b; }
+  .acts { display: flex; gap: 10px; }
+  .btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-size: 17px; font-weight: 800; }
+  .btn-cancel { background: #39404e; color: #eef1f5; }
+  .btn-ok { background: #3fae6a; color: #04170a; }
+  .btn:disabled { opacity: 0.5; }
+
+  #toast {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+    background: #3fae6a; color: #04170a; padding: 12px 20px; border-radius: 10px;
+    font-weight: 800; font-size: 15px; z-index: 30; display: none; max-width: 90%;
+  }
+  #toast.err { background: #ff5a4d; color: #fff; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="head-row">
+      <h1>납품 처리</h1>
+      <div class="tabs">
+        <button class="tab active" id="tab-list">처리</button>
+        <button class="tab" id="tab-log">이력</button>
+      </div>
+    </div>
+    <input id="search" type="text" placeholder="품명 검색...">
+    <div id="status">불러오는 중...</div>
+  </header>
+  <div class="list" id="list"></div>
+</div>
+
+<div id="toast"></div>
+
+<div id="backdrop">
+  <div id="modal">
+    <h2 id="m-title"></h2>
+    <div class="sub" id="m-sub"></div>
+    <input id="qty" type="number" inputmode="numeric" placeholder="0">
+    <div class="quicks" id="quicks"></div>
+    <div class="acts">
+      <button class="btn btn-cancel" id="m-cancel">취소</button>
+      <button class="btn btn-ok" id="m-ok">납품 처리</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyQcw5_g0rei6gwiue-cC5A6HgbnagX1EQtBk1pE2O36nAUeoMg4PCrWI-ABc247KLH/exec";
+
+let view = "list";      // list | log
+let allItems = [];
+let logItems = [];
+let current = null;
+
+function parseNum(s) {
+  if (!s) return 0;
+  const n = parseFloat(String(s).replace(/,/g, "").trim());
+  return isNaN(n) ? 0 : n;
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  const str = String(s).trim();
+  const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (iso) return new Date(+iso[1], +iso[2]-1, +iso[3]);
+  const p = str.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+  if (p) return new Date(+p[1], +p[2]-1, +p[3]);
+  const d = new Date(str.replace(/\./g,"-").replace(/\//g,"-"));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function dday(d) {
+  if (!d) return { label: "-", cls: "t-ok" };
+  const n = new Date();
+  const today = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = Math.round((t - today) / 86400000);
+  if (diff < 0) return { label: `D+${Math.abs(diff)}`, cls: "t-danger" };
+  if (diff === 0) return { label: "D-DAY", cls: "t-danger" };
+  if (diff <= 3) return { label: `D-${diff}`, cls: "t-danger" };
+  if (diff <= 7) return { label: `D-${diff}`, cls: "t-warn" };
+  return { label: `D-${diff}`, cls: "t-ok" };
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function setStatus(t, err) {
+  const el = document.getElementById("status");
+  el.textContent = t;
+  el.className = err ? "err" : "";
+}
+
+function toast(msg, err) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = err ? "err" : "";
+  t.style.display = "block";
+  setTimeout(() => { t.style.display = "none"; }, 2400);
+}
+
+async function loadItems() {
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + "?_=" + Date.now(), { cache: "no-store" });
+    const recs = await res.json();
+    allItems = recs.map(r => {
+      const qtyDue = parseNum(r.qtyDue), qtyIn = parseNum(r.qtyIn);
+      return {
+        raw: r, row: r._row, date: parseDate(r.date),
+        name: r.name || "(품명없음)", qtyDue, qtyIn,
+        remaining: Math.max(qtyDue - qtyIn, 0),
+        done: qtyDue > 0 && qtyIn >= qtyDue
+      };
+    }).filter(it => !it.done).sort((a,b) => (a.date||0) - (b.date||0));
+    if (view === "list") render();
+    setStatus(`${allItems.length}건 미납품 · ${new Date().toLocaleTimeString("ko-KR")}`);
+  } catch (e) {
+    setStatus("불러오기 실패: " + e.message, true);
+  }
+}
+
+async function loadLog() {
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + "?mode=log&_=" + Date.now(), { cache: "no-store" });
+    logItems = await res.json();
+    if (view === "log") render();
+  } catch (e) {
+    setStatus("이력 불러오기 실패: " + e.message, true);
+  }
+}
+
+function render() {
+  const el = document.getElementById("list");
+  const q = document.getElementById("search").value.trim().toLowerCase();
+
+  if (view === "log") {
+    const filtered = q ? logItems.filter(l => String(l.name).toLowerCase().includes(q)) : logItems;
+    if (!filtered.length) {
+      el.innerHTML = '<div class="empty">처리 이력이 없습니다.</div>';
+      return;
+    }
+    el.innerHTML = filtered.map(l => {
+      const cancelled = l.status === "취소됨";
+      return `<div class="log-item ${cancelled ? "cancelled" : ""}">
+        <div style="flex:1;min-width:0;">
+          <div class="log-name">${esc(l.name)}</div>
+          <div class="log-meta">${esc(l.time)} · 처리후 ${Number(l.after).toLocaleString()}</div>
+          <div class="log-qty">+${Number(l.qty).toLocaleString()}</div>
+        </div>
+        ${cancelled
+          ? '<span class="undo-done">취소됨</span>'
+          : `<button class="btn-undo" data-logrow="${l.logRow}">되돌리기</button>`}
+      </div>`;
+    }).join("");
+
+    el.querySelectorAll(".btn-undo").forEach(b => {
+      b.addEventListener("click", () => doUndo(b.getAttribute("data-logrow"), b));
+    });
+    return;
+  }
+
+  const filtered = q ? allItems.filter(it => it.name.toLowerCase().includes(q)) : allItems;
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty">해당하는 미납품 품목이 없습니다.</div>';
+    return;
+  }
+  el.innerHTML = filtered.map((it, i) => {
+    const info = dday(it.date);
+    const ds = it.date ? `${it.date.getMonth()+1}/${it.date.getDate()}` : "-";
+    return `<div class="item" data-idx="${allItems.indexOf(it)}">
+      <div class="item-main">
+        <div class="item-name">${esc(it.name)}</div>
+        <div class="item-sub">${ds} 예정</div>
+        <div class="item-qty">${it.qtyIn.toLocaleString()} / ${it.qtyDue.toLocaleString()} · <b>잔여 ${it.remaining.toLocaleString()}</b></div>
+      </div>
+      <span class="tag ${info.cls}">${info.label}</span>
+    </div>`;
+  }).join("");
+
+  el.querySelectorAll(".item").forEach(d => {
+    d.addEventListener("click", () => openModal(allItems[+d.getAttribute("data-idx")]));
+  });
+}
+
+function openModal(item) {
+  current = item;
+  document.getElementById("m-title").textContent = item.name;
+  document.getElementById("m-sub").textContent =
+    `현재 ${item.qtyIn.toLocaleString()} / ${item.qtyDue.toLocaleString()} · 잔여 ${item.remaining.toLocaleString()}`;
+  const q = document.getElementById("qty");
+  q.value = item.remaining > 0 ? item.remaining : "";
+
+  const wrap = document.getElementById("quicks");
+  const vals = [...new Set([item.remaining, 10, 50, 100, 500].filter(v => v > 0))].slice(0, 4);
+  wrap.innerHTML = vals.map(v => `<button class="quick" data-v="${v}">${v.toLocaleString()}</button>`).join("");
+  wrap.querySelectorAll(".quick").forEach(b => {
+    b.addEventListener("click", () => { q.value = b.getAttribute("data-v"); });
+  });
+
+  document.getElementById("backdrop").classList.add("open");
+}
+
+function closeModal() {
+  document.getElementById("backdrop").classList.remove("open");
+  current = null;
+}
+
+async function submitReceive() {
+  const v = parseFloat(document.getElementById("qty").value);
+  if (!current || !v || v <= 0) { toast("수량을 올바르게 입력해주세요", true); return; }
+  const btn = document.getElementById("m-ok");
+  btn.disabled = true; btn.textContent = "처리 중...";
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ row: current.row, addQty: v })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || "처리 실패");
+    toast(`처리 완료: ${current.name} +${v.toLocaleString()}`);
+    closeModal();
+    await loadItems();
+    await loadLog();
+  } catch (e) {
+    toast("실패: " + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = "납품 처리";
+  }
+}
+
+async function doUndo(logRow, btn) {
+  if (!confirm("이 처리를 되돌릴까요?\n입고수량이 차감됩니다.")) return;
+  btn.disabled = true; btn.textContent = "처리 중";
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "undo", logRow: Number(logRow) })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || "되돌리기 실패");
+    toast("되돌리기 완료");
+    await loadLog();
+    await loadItems();
+  } catch (e) {
+    toast("실패: " + e.message, true);
+    btn.disabled = false; btn.textContent = "되돌리기";
+  }
+}
+
+function switchView(v) {
+  view = v;
+  document.getElementById("tab-list").className = "tab" + (v === "list" ? " active" : "");
+  document.getElementById("tab-log").className = "tab" + (v === "log" ? " active" : "");
+  document.getElementById("search").placeholder = v === "log" ? "이력에서 품명 검색..." : "품명 검색...";
+  render();
+  if (v === "log") loadLog();
+}
+
+document.getElementById("search").addEventListener("input", render);
+document.getElementById("tab-list").addEventListener("click", () => switchView("list"));
+document.getElementById("tab-log").addEventListener("click", () => switchView("log"));
+document.getElementById("m-cancel").addEventListener("click", closeModal);
+document.getElementById("m-ok").addEventListener("click", submitReceive);
+document.getElementById("backdrop").addEventListener("click", e => {
+  if (e.target.id === "backdrop") closeModal();
+});
+
+loadItems();
+loadLog();
+setInterval(() => { if (view === "list") loadItems(); }, 30000);
+</script>
+</body>
+</html>

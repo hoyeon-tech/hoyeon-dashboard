@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>납품 현황판</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: #0f1216;
+    color: #f2f5f9;
+    font-family: 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    width: 100vw; height: 100vh;
+    padding: 1.2vh 1.2vw;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 0.4vh solid #2b323d;
+    padding-bottom: 1vh;
+    flex-shrink: 0;
+  }
+  .h-left { display: flex; align-items: baseline; gap: 1.4vw; }
+  h1 { font-size: 3.4vh; font-weight: 900; letter-spacing: -0.5px; }
+  .h-sub { font-size: 1.9vh; color: #ff5a4d; font-weight: 800; letter-spacing: 1px; }
+  .h-right { text-align: right; }
+  #clock { font-size: 2.6vh; color: #b9c2d0; font-variant-numeric: tabular-nums; font-weight: 700; }
+  #status { font-size: 1.4vh; color: #5d6676; margin-top: 0.3vh; }
+  #status.err { color: #ff5a4d; }
+
+  #grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 1.1vh 1vw;
+    padding: 1.2vh 0;
+    min-height: 0;
+  }
+
+  .card {
+    background: #1b2027;
+    border: 0.35vh solid #39414f;
+    border-radius: 1.4vh;
+    padding: 1.4vh 1.3vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .card.danger {
+    border-color: #ff4438;
+    background: linear-gradient(150deg, #4a1d19 0%, #22262e 70%);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  .card.warn {
+    border-color: #ffb02e;
+    background: linear-gradient(150deg, #453518 0%, #22262e 70%);
+  }
+  .card.ok { border-color: #356b4c; }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,68,56,0.5); }
+    50% { box-shadow: 0 0 0 1vh rgba(255,68,56,0); }
+  }
+
+  .card.placeholder {
+    background: transparent;
+    border: 0.25vh dashed #232932;
+    animation: none;
+  }
+
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 0.7vw; min-width: 0; }
+
+  .dday {
+    font-size: 5.2vh;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -2px;
+    white-space: nowrap;
+  }
+  .danger .dday { color: #ff4438; }
+  .warn .dday { color: #ffb02e; }
+  .ok .dday { color: #4ede8f; }
+
+  .date { font-size: 2vh; color: #b9c2d0; white-space: nowrap; font-weight: 600; }
+
+  .name {
+    font-size: 3.6vh;
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #ffffff;
+  }
+
+  .qty {
+    font-size: 3.4vh;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: nowrap;
+    color: #ffffff;
+  }
+  .qty .frac { font-size: 2.5vh; color: #a8b2c2; font-weight: 800; }
+
+  .note {
+    background: #39414f;
+    color: #dbe2ee;
+    font-size: 1.6vh;
+    font-weight: 800;
+    border-radius: 2vh;
+    padding: 0.4vh 0.8vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 52%;
+  }
+
+  footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 0.3vh solid #2b323d;
+    padding-top: 0.9vh;
+    flex-shrink: 0;
+    font-size: 2vh;
+    font-weight: 800;
+    color: #8b95a6;
+  }
+  .dots { display: flex; gap: 0.7vw; }
+  .dot { width: 1.1vh; height: 1.1vh; border-radius: 50%; background: #39414f; }
+  .dot.on { background: #ff4438; }
+
+  #empty-msg {
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4vh;
+    font-weight: 800;
+    color: #4ede8f;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="h-left">
+      <h1>납품 현황판</h1>
+      <span class="h-sub">긴급 · 3일 이내</span>
+    </div>
+    <div class="h-right">
+      <div id="clock"></div>
+      <div id="status">불러오는 중...</div>
+    </div>
+  </header>
+
+  <div id="grid"></div>
+
+  <footer>
+    <span id="counts"></span>
+    <span class="dots" id="dots"></span>
+    <span id="pageinfo"></span>
+  </footer>
+</div>
+
+<script>
+var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyQcw5_g0rei6gwiue-cC5A6HgbnagX1EQtBk1pE2O36nAUeoMg4PCrWI-ABc247KLH/exec";
+var SHEET_ID = "1dQXdZFNk0RRY1KKQIAuVuGUYpqd5TejbBZQalI0DYQQ";
+var SHEET_NAME = "DATA";
+var PUB_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRLXM6kN4l93bVUkEre3LPO6jz6CsdIeYrdScwn6b8TW_Fmh1ibVztXWEoQi31Wc1rPAMsTXozm0Arx/pub?gid=1372408514&single=true&output=csv";
+var GVIZ_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(SHEET_NAME);
+
+var CSV_CANDIDATES = [
+  { name: "웹게시", url: PUB_CSV_URL },
+  { name: "gviz", url: GVIZ_URL },
+  { name: "프록시", url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(GVIZ_URL) }
+];
+
+var REFRESH_MS = 60000;
+var PAGE_MS = 10000;
+var WITHIN_DAYS = 3;      // 표시 기준: 이 일수 이내(지연 포함)
+var PER_PAGE = 12;        // 3칸 x 4줄
+
+var pageItems = [];
+var totalAll = 0;
+var page = 0;
+
+function xhrGet(url, isJson, ok, fail) {
+  try {
+    var x = new XMLHttpRequest();
+    x.open("GET", url, true);
+    x.onreadystatechange = function () {
+      if (x.readyState !== 4) return;
+      if (x.status >= 200 && x.status < 300) {
+        if (isJson) { try { ok(JSON.parse(x.responseText)); } catch (e) { fail("파싱실패"); } }
+        else { if (!x.responseText) fail("빈응답"); else ok(x.responseText); }
+      } else fail("HTTP " + x.status);
+    };
+    x.onerror = function () { fail("네트워크"); };
+    x.send();
+  } catch (e) { fail("요청실패"); }
+}
+
+function parseCSV(text) {
+  var rows = [], row = [], f = "", q = false;
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charAt(i);
+    if (q) {
+      if (c === '"') { if (text.charAt(i+1) === '"') { f += '"'; i++; } else q = false; }
+      else f += c;
+    } else {
+      if (c === '"') q = true;
+      else if (c === ',') { row.push(f); f = ""; }
+      else if (c === '\n') { row.push(f); rows.push(row); row = []; f = ""; }
+      else if (c !== '\r') f += c;
+    }
+  }
+  if (f.length || row.length) { row.push(f); rows.push(row); }
+  var out = [];
+  for (var j = 0; j < rows.length; j++) {
+    for (var k = 0; k < rows[j].length; k++) {
+      if (rows[j][k].replace(/^\s+|\s+$/g, "") !== "") { out.push(rows[j]); break; }
+    }
+  }
+  return out;
+}
+
+function toRecords(rows) {
+  function t(v) { return (v || "").replace(/^\s+|\s+$/g, ""); }
+  var out = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    out.push({ date: t(r[0]), name: t(r[1]), qtyDue: t(r[2]), qtyIn: t(r[3]), note: t(r[6]) });
+  }
+  return out;
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  var str = String(s).replace(/^\s+|\s+$/g, "");
+  var iso = str.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (iso) return new Date(+iso[1], +iso[2]-1, +iso[3]);
+  var p = str.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+  if (p) return new Date(+p[1], +p[2]-1, +p[3]);
+  var d = new Date(str.replace(/\./g,"-").replace(/\//g,"-"));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function parseNum(s) {
+  if (!s) return 0;
+  var n = parseFloat(String(s).replace(/,/g, ""));
+  return isNaN(n) ? 0 : n;
+}
+
+function fmtNote(s) {
+  if (!s) return "";
+  var str = String(s).replace(/^\s+|\s+$/g, "");
+  var iso = str.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (iso) return (+iso[2]) + "/" + (+iso[3]);
+  return str;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function ddayInfo(d) {
+  var n = new Date();
+  var today = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  var t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  var diff = Math.round((t - today) / 86400000);
+  if (diff < 0) return { diff: diff, label: "D+" + Math.abs(diff), cls: "danger" };
+  if (diff === 0) return { diff: 0, label: "D-DAY", cls: "danger" };
+  if (diff <= 3) return { diff: diff, label: "D-" + diff, cls: "danger" };
+  if (diff <= 7) return { diff: diff, label: "D-" + diff, cls: "warn" };
+  return { diff: diff, label: "D-" + diff, cls: "ok" };
+}
+
+function cardHTML(it) {
+  var info = ddayInfo(it.date);
+  var wd = ["일","월","화","수","목","금","토"][it.date.getDay()];
+  var ds = (it.date.getMonth()+1) + "/" + it.date.getDate() + " (" + wd + ")";
+
+  var h = '<div class="card ' + info.cls + '">';
+  h += '<div class="row"><span class="dday">' + info.label + '</span>';
+  h += '<span class="date">' + ds + '</span></div>';
+  h += '<div class="name">' + esc(it.name) + '</div>';
+  h += '<div class="row"><span class="qty">' + it.qtyDue.toLocaleString() +
+       ' <span class="frac">(' + it.qtyIn.toLocaleString() + ')</span></span>';
+  if (it.note) h += '<span class="note">' + esc(it.note) + '</span>';
+  h += '</div></div>';
+  return h;
+}
+
+function render() {
+  var grid = document.getElementById("grid");
+  var dots = document.getElementById("dots");
+  var counts = document.getElementById("counts");
+  var pageinfo = document.getElementById("pageinfo");
+
+  counts.textContent = "3일 이내 " + pageItems.length + "건  ·  전체 미납품 " + totalAll + "건";
+
+  if (!pageItems.length) {
+    grid.innerHTML = '<div id="empty-msg">3일 이내 납품 예정이 없습니다</div>';
+    dots.innerHTML = "";
+    pageinfo.textContent = "";
+    return;
+  }
+
+  var totalPages = Math.ceil(pageItems.length / PER_PAGE);
+  if (page >= totalPages) page = 0;
+
+  var start = page * PER_PAGE;
+  var slice = pageItems.slice(start, start + PER_PAGE);
+
+  var html = "";
+  for (var i = 0; i < slice.length; i++) html += cardHTML(slice[i]);
+  // 빈 칸 채우기 (카드 크기 균일 유지)
+  for (var j = slice.length; j < PER_PAGE; j++) html += '<div class="card placeholder"></div>';
+  grid.innerHTML = html;
+
+  if (totalPages > 1) {
+    var d = "";
+    for (var k = 0; k < totalPages; k++) d += '<span class="dot' + (k === page ? " on" : "") + '"></span>';
+    dots.innerHTML = d;
+    pageinfo.textContent = (page + 1) + " / " + totalPages;
+  } else {
+    dots.innerHTML = "";
+    pageinfo.textContent = "";
+  }
+}
+
+function processRecords(records) {
+  var list = [], allPending = 0;
+  for (var i = 0; i < records.length; i++) {
+    var r = records[i];
+    var d = parseDate(r.date);
+    if (!d) continue;
+    var qtyDue = parseNum(r.qtyDue), qtyIn = parseNum(r.qtyIn);
+    if (qtyDue > 0 && qtyIn >= qtyDue) continue;  // 납품완료 제외
+    allPending++;
+    if (ddayInfo(d).diff > WITHIN_DAYS) continue;  // 3일 초과 제외
+    list.push({ date: d, name: r.name || "(품명없음)", qtyDue: qtyDue, qtyIn: qtyIn, note: fmtNote(r.note) });
+  }
+  list.sort(function (a, b) { return a.date - b.date; });
+  pageItems = list;
+  totalAll = allPending;
+  render();
+}
+
+var isLoading = false;
+function setStatus(t, err) {
+  var el = document.getElementById("status");
+  el.textContent = t;
+  el.className = err ? "err" : "";
+}
+
+function tryCSV(list, i) {
+  if (i >= list.length) { setStatus("불러오기 실패", true); isLoading = false; return; }
+  var e = list[i];
+  var url = e.url + (e.url.indexOf("?") >= 0 ? "&" : "?") + "_=" + Date.now();
+  xhrGet(url, false, function (text) {
+    try {
+      processRecords(toRecords(parseCSV(text)));
+      setStatus("갱신 " + new Date().toLocaleTimeString("ko-KR"), false);
+      isLoading = false;
+    } catch (ex) { tryCSV(list, i + 1); }
+  }, function () { tryCSV(list, i + 1); });
+}
+
+function load() {
+  if (isLoading) return;
+  isLoading = true;
+  if (APPS_SCRIPT_URL) {
+    var url = APPS_SCRIPT_URL + "?_=" + Date.now();
+    xhrGet(url, true, function (recs) {
+      processRecords(recs);
+      setStatus("갱신 " + new Date().toLocaleTimeString("ko-KR"), false);
+      isLoading = false;
+    }, function () { tryCSV(CSV_CANDIDATES, 0); });
+    return;
+  }
+  tryCSV(CSV_CANDIDATES, 0);
+}
+
+function tickClock() {
+  document.getElementById("clock").textContent =
+    new Date().toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function nextPage() {
+  if (pageItems.length <= PER_PAGE) return;
+  var totalPages = Math.ceil(pageItems.length / PER_PAGE);
+  page = (page + 1) % totalPages;
+  render();
+}
+
+tickClock();
+setInterval(tickClock, 1000);
+load();
+setInterval(load, REFRESH_MS);
+setInterval(nextPage, PAGE_MS);
+</script>
+</body>
+</html>
